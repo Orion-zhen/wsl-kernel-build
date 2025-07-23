@@ -52,11 +52,10 @@ jobs:
 
       - name: Organize Configs
         run: |
-          # 修改内核后缀
-          scripts/config --set-str CONFIG_LOCALVERSION "-Orion-WSL2"
-
           # 默认配置项
           make olddefconfig
+          # 修改内核后缀
+          scripts/config --set-str CONFIG_LOCALVERSION "-Orion-WSL2"
 
       - name: Build
         run: |

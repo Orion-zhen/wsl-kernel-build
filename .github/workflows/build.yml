@@ -1,0 +1,82 @@
+name: WSL2 Kernel Build
+
+on:
+  schedule:
+    - cron: 0 0 * * 1
+
+  workflow_dispatch:
+
+
+jobs:
+  kernel-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+
+      - name: Setup Build Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt update -y
+          sudo apt install -y build-essential flex bison libssl-dev libelf-dev libncurses-dev dwarves git wget
+
+      - name: System Overview
+        run: |
+          echo "已知CPU型号(降序): 7763, 8370C, 8272CL, 8171M, E5 系列"
+          echo "--------------------------CPU信息--------------------------"
+          echo "CPU物理数量: $(cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l)"
+          echo -e "CPU核心及版本信息: $(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
+          echo "--------------------------内存信息--------------------------"
+          echo "已安装内存详细信息:"
+          sudo lshw -short -C memory | grep GiB
+          echo -e "\n"
+          echo "--------------------------硬盘信息--------------------------"
+          echo -e  "硬盘数量: $(ls /dev/sd* | grep -v [1-9] | wc -l) \n"
+          echo "硬盘详情:"
+          df -Th
+
+      - name: Fetch Linux
+        uses: actions/checkout@v4
+        with:
+          repository: torvalds/linux
+          path: .
+          submodules: true
+
+      - name: Fetch WSL Config
+        run: |
+          wget -O .config https://github.com/microsoft/WSL2-Linux-Kernel/raw/linux-msft-wsl-6.6.y/arch/x86/configs/config-wsl
+
+      - name: Organize Configs
+        run: |
+          # 修改内核后缀
+          scripts/config --set-str CONFIG_LOCALVERSION "-Orion-WSL2"
+
+          # 默认配置项
+          make olddefconfig
+
+      - name: Build
+        run: |
+          make -j$(nproc)
+
+      - name: Delete Stale Release
+        run: |
+          gh release delete wsl-kernel --cleanup-tag --yes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        continue-on-error: true
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: wsl-kernel
+          name: "WSL Kernel"
+          body: |
+            x86_64 架构, 适用于 WSL2 的内核映像.
+          draft: false
+          prerelease: false
+          files: |
+            ${{ github.workspace }}/arch/x86_64/boot/bzImage

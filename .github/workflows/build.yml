@@ -91,9 +91,9 @@ jobs:
       - name: Build
         run: |
           make -j$(nproc)
-          make INSTALL_MOD_PATH="$PWD/modules" modules_install
+          # make INSTALL_MOD_PATH="$PWD/modules" modules_install
 
-          sudo bash ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" $(make -s kernelrelease) modules.vhdx
+          # sudo bash ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" $(make -s kernelrelease) modules.vhdx
 
       - name: Delete Stale Release
         run: |
@@ -113,4 +113,4 @@ jobs:
           prerelease: false
           files: |
             ${{ github.workspace }}/arch/x86_64/boot/bzImage
-            ${{ github.workspace }}/modules.vhdx
+            # ${{ github.workspace }}/modules.vhdx

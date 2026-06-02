@@ -8,7 +8,7 @@ on:
 
 
 jobs:
-  kernel-build:
+  ms-kernel-build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,26 +40,32 @@ jobs:
           df -Th
 
       - name: Fetch Linux
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          repository: torvalds/linux
+          repository: microsoft/WSL2-Linux-Kernel
           path: .
           submodules: true
 
-      - name: Fetch WSL Config
-        run: |
-          wget -O .config https://github.com/microsoft/WSL2-Linux-Kernel/raw/linux-msft-wsl-6.6.y/arch/x86/configs/config-wsl
+      # - name: Fetch WSL Config
+      #   run: |
+      #     wget -O .config https://github.com/microsoft/WSL2-Linux-Kernel/raw/linux-msft-wsl-6.6.y/arch/x86/configs/config-wsl
 
       - name: Organize Configs
         run: |
           # 默认配置项
-          make olddefconfig
+          cp Microsoft/config-wsl .config
           # 修改内核后缀
-          scripts/config --set-str CONFIG_LOCALVERSION "-Orion-WSL2"
+          scripts/config --set-str LOCALVERSION "-Orion-WSL2"
+          scripts/config --disable LOCALVERSION_AUTO
+
+          make olddefconfig
 
       - name: Build
         run: |
           make -j$(nproc)
+          make INSTALL_MOD_PATH="$PWD/modules" modules_install
+
+          bash ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" $(make -s kernelrelease) modules.vhdx
 
       - name: Delete Stale Release
         run: |
@@ -69,7 +75,7 @@ jobs:
         continue-on-error: true
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: wsl-kernel
           name: "WSL Kernel"
@@ -79,3 +85,4 @@ jobs:
           prerelease: false
           files: |
             ${{ github.workspace }}/arch/x86_64/boot/bzImage
+            ${{ github.workspace }}/modules.vhdx

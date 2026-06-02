@@ -50,6 +50,34 @@ jobs:
       #   run: |
       #     wget -O .config https://github.com/microsoft/WSL2-Linux-Kernel/raw/linux-msft-wsl-6.6.y/arch/x86/configs/config-wsl
 
+      - name: Prepare Privileged Loop/Mount Environment
+        run: |
+          set -euxo pipefail
+
+          # GitHub-hosted Ubuntu runner 应该支持 passwordless sudo
+          sudo -n true
+
+          # 准备 loop device
+          sudo modprobe loop || true
+
+          # 有些 runner 镜像里 loop 节点可能没有预创建，手动补齐
+          if [ ! -e /dev/loop-control ]; then
+            sudo mknod /dev/loop-control c 10 237
+          fi
+
+          for i in $(seq 0 63); do
+            if [ ! -e "/dev/loop$i" ]; then
+              sudo mknod "/dev/loop$i" b 7 "$i"
+            fi
+          done
+
+          sudo chmod 660 /dev/loop-control /dev/loop* || true
+          sudo chown root:disk /dev/loop-control /dev/loop* || true
+
+          # 验证 losetup 可用
+          sudo losetup -f
+          sudo losetup -a || true
+
       - name: Organize Configs
         run: |
           # 默认配置项
@@ -65,7 +93,7 @@ jobs:
           make -j$(nproc)
           make INSTALL_MOD_PATH="$PWD/modules" modules_install
 
-          bash ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" $(make -s kernelrelease) modules.vhdx
+          sudo bash ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" $(make -s kernelrelease) modules.vhdx
 
       - name: Delete Stale Release
         run: |
